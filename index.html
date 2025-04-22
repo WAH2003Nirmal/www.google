@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Essential for responsiveness -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>System Diagnostics - Multi-Device</title>
+    <style>
+      :root {
+        --hacker-green: lime;
+        --hacker-red: red;
+        --hacker-yellow: yellow;
+        --hacker-blue: cyan;
+        --background: black;
+        --bsod-blue: #0078d7;
+        --bsod-text: white;
+        --matrix-green: #00ff41;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background-color: var(--background);
+        color: var(--hacker-green);
+        font-family: "Consolas", "Courier New", Courier, monospace;
+        font-size: 14px; /* Base font size for desktop */
+        overflow: hidden; /* Keep hidden for immersion */
+        -webkit-text-size-adjust: 100%; /* Prevent iOS font scaling */
+        text-size-adjust: 100%; /* Prevent font scaling */
+      }
+      .hide-cursor {
+        cursor: none !important;
+      }
+      #container {
+        padding: 10px;
+        height: calc(100vh - 20px);
+        display: flex;
+        flex-direction: column;
+        position: relative;
+      }
+      #prankContent {
+        display: flex;
+        height: 100%;
+        flex-direction: column;
+      }
+      #topBar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #333;
+        flex-shrink: 0;
+      }
+      .status-indicators {
+        display: flex;
+        align-items: center;
+      }
+      #webcamIndicator,
+      #micIndicator {
+        width: 10px; /* Slightly smaller */
+        height: 10px;
+        background-color: #555;
+        border-radius: 50%;
+        margin-right: 8px;
+        border: 1px solid #888;
+      }
+      #webcamIndicator.active {
+        background-color: var(--hacker-red);
+        animation: blink-webcam 0.7s infinite;
+        box-shadow: 0 0 6px var(--hacker-red);
+      }
+      #micIndicator.active {
+        background-color: var(--hacker-yellow);
+        animation: blink-mic 0.9s infinite;
+        box-shadow: 0 0 6px var(--hacker-yellow);
+      }
+      #fakeTime {
+        font-size: 12px;
+      }
+      #terminal {
+        flex-grow: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch; /* Smoother scrolling on iOS */
+        margin-top: 5px;
+        padding-right: 5px;
+        position: relative;
+      }
+      #terminal::-webkit-scrollbar {
+        width: 6px;
+      } /* Thinner scrollbar */
+      #terminal::-webkit-scrollbar-track {
+        background: #222;
+      }
+      #terminal::-webkit-scrollbar-thumb {
+        background: #555;
+        border-radius: 3px;
+      }
+      #terminal::-webkit-scrollbar-thumb:hover {
+        background: #777;
+      }
+
+      #terminal p {
+        margin: 1px 0;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        font-size: inherit; /* Inherit from body/container */
+      }
+      .term-cmd {
+        color: var(--hacker-blue);
+      }
+      .term-input::before {
+        content: "root@host:~# ";
+        color: var(--hacker-blue);
+      }
+      .term-warn {
+        color: var(--hacker-yellow);
+        font-weight: bold;
+      }
+      .term-crit {
+        color: var(--hacker-red);
+        font-weight: bold;
+        animation: blink-red 0.6s infinite;
+      }
+      .term-success {
+        color: lightgreen;
+      }
+      .term-ip {
+        color: #ff9966;
+      }
+      .term-filename {
+        color: #cc99ff;
+      }
+      .term-progress {
+        color: #88ddff;
+      }
+      .term-data {
+        color: #ffcc66;
+      }
+
+      #fakePopup {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 90%; /* Responsive width */
+        max-width: 380px; /* Max width for larger screens */
+        background-color: #f0f0f0;
+        border: 2px solid #aaa;
+        box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.7);
+        color: black;
+        padding: 15px;
+        z-index: 100;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        animation: shake 0.5s;
+        border-radius: 5px;
+        font-size: 14px; /* Default popup font size */
+      }
+      #fakePopup h3 {
+        margin: 0 0 10px 0;
+        color: #cc0000;
+        font-size: 1.1em; /* Relative font size */
+        border-bottom: 1px solid #ccc;
+        padding-bottom: 5px;
+        display: flex;
+        align-items: center;
+      }
+      #fakePopup h3::before {
+        content: "⚠️";
+        margin-right: 8px;
+        font-size: 1.3em;
+      }
+      #fakePopup p {
+        margin: 10px 0;
+        font-size: 1em;
+      }
+      #fakePopupButton {
+        display: block;
+        margin: 15px auto 0 auto;
+        padding: 10px 20px; /* Larger tap target */
+        background-color: #aaa;
+        border: 1px solid #555;
+        cursor: pointer;
+        font-weight: bold;
+        border-radius: 3px;
+        font-size: 1em;
+      }
+      #fakePopupButton:hover {
+        background-color: #999;
+      }
+
+      #ransomScreen {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background-color: rgba(150, 0, 0, 0.97);
+        color: white;
+        z-index: 200;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        padding: 20px 15px; /* Responsive padding */
+        font-size: 16px; /* Base font size */
+        animation: pulse-bg 1.5s infinite alternate;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        overflow-y: auto; /* Allow scrolling if content overflows */
+      }
+      #ransomScreen h1 {
+        font-size: 2em; /* Relative font size */
+        margin-bottom: 15px;
+        text-shadow: 2px 2px 4px black;
+        animation: pulse-text 1.5s infinite;
+      }
+      #timer {
+        font-size: 2.2em; /* Relative font size */
+        margin: 15px 0;
+        color: var(--hacker-yellow);
+        font-weight: bold;
+        text-shadow: 1px 1px 3px black;
+      }
+      .ransom-details {
+        width: 100%;
+        max-width: 600px;
+        background-color: rgba(0, 0, 0, 0.3);
+        padding: 15px;
+        border-radius: 10px;
+        margin: 15px auto;
+        font-size: 0.9em; /* Slightly smaller text */
+      }
+      .encrypted-files {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin: 15px 0;
+        font-family: monospace;
+        font-size: 0.85em;
+        max-height: 120px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        background: rgba(0, 0, 0, 0.2); /* Background for scroll area */
+        border-radius: 4px;
+        padding: 5px;
+      }
+      .encrypted-file {
+        background-color: rgba(0, 0, 0, 0.5);
+        padding: 4px 8px;
+        margin: 4px;
+        border-radius: 3px;
+        color: #ff9966;
+        word-break: break-all;
+      }
+
+      #bsodScreen {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background-color: var(--bsod-blue);
+        color: var(--bsod-text);
+        z-index: 300;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: flex-start;
+        text-align: left;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        padding: 15% 5% 5% 5%; /* Adjust padding for mobile */
+        font-size: 16px; /* Base BSOD font size */
+        line-height: 1.5;
+        overflow-y: auto; /* Allow scrolling if needed */
+      }
+      #bsodScreen .sad-face {
+        font-size: 15vw; /* Responsive size */
+        max-font-size: 100px; /* Max size */
+        width: auto; /* Let it size naturally */
+        text-align: left;
+        margin-bottom: 20px;
+        font-weight: lighter;
+      }
+      #bsodScreen p {
+        margin: 8px 0;
+        font-size: 1em;
+      }
+      #bsodScreen .stopcode {
+        margin-top: 20px;
+        font-size: 0.9em;
+      }
+      #bsodScreen .qr-placeholder {
+        display: block;
+        width: 80px; /* Smaller QR */
+        height: 80px;
+        background-color: white;
+        margin: 20px 0 15px 0;
+        border: 3px solid white;
+        background-image: linear-gradient(45deg, #333 25%, transparent 25%),
+          linear-gradient(-45deg, #333 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, #333 75%),
+          linear-gradient(-45deg, transparent 75%, #333 75%);
+        background-size: 10px 10px; /* Smaller pattern */
+        background-position: 0 0, 0 5px, 5px -5px, -5px 0px;
+      }
+      .progress-bar {
+        width: 50%; /* Wider progress bar relative to mobile screen */
+        height: 5px;
+        background-color: rgba(255, 255, 255, 0.2);
+        border-radius: 0;
+        margin: 8px 0;
+        overflow: hidden;
+        border: none;
+      }
+      .progress-bar-fill {
+        height: 100%;
+        background-color: var(--bsod-text);
+        width: 0%;
+        transition: width 0.5s linear;
+        border-radius: 0;
+      }
+
+      #matrixEffect {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 150;
+        opacity: 0.15;
+        pointer-events: none;
+        display: none;
+      }
+
+      #revealMessage {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background-color: var(--background);
+        color: var(--hacker-green);
+        z-index: 400;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        font-size: 8vw; /* Responsive font size */
+        max-font-size: 48px; /* Max size on large screens */
+        font-weight: bold;
+        font-family: "Courier New", Courier, monospace;
+        text-shadow: 0 0 8px var(--hacker-green);
+        opacity: 0;
+        animation: fadeInReveal 1.5s forwards;
+        animation-delay: 0.5s;
+        padding: 10px; /* Add padding */
+      }
+      #revealMessage p:last-child {
+        font-size: 0.4em; /* Smaller relative size for subtext */
+        margin-top: 15px;
+      }
+
+      /* --- Animations (Keep as is) --- */
+      @keyframes blink-red {
+        50% {
+          color: #600;
+          background-color: rgba(255, 0, 0, 0.1);
+        }
+      }
+      @keyframes blink-webcam {
+        0%,
+        100% {
+          background-color: var(--hacker-red);
+          opacity: 1;
+        }
+        50% {
+          background-color: #800;
+          opacity: 0.5;
+        }
+      }
+      @keyframes blink-mic {
+        0%,
+        100% {
+          background-color: var(--hacker-yellow);
+          opacity: 1;
+        }
+        50% {
+          background-color: #880;
+          opacity: 0.5;
+        }
+      }
+      @keyframes pulse-text {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 0.9;
+        }
+        50% {
+          transform: scale(1.03);
+          opacity: 1;
+        }
+      }
+      @keyframes pulse-bg {
+        0%,
+        100% {
+          background-color: rgba(120, 0, 0, 0.95);
+        }
+        50% {
+          background-color: rgba(180, 0, 0, 0.98);
+        }
+      }
+      .screen-flash-red {
+        animation: flash-red 0.2s ease-out;
+      }
+      @keyframes flash-red {
+        0%,
+        100% {
+          background-color: var(--background);
+        }
+        50% {
+          background-color: darkred;
+        }
+      }
+      @keyframes shake {
+        10%,
+        90% {
+          transform: translate(-50%, -51%);
+        }
+        20%,
+        80% {
+          transform: translate(-50%, -49%);
+        }
+        30%,
+        50%,
+        70% {
+          transform: translate(-51%, -50%);
+        }
+        40%,
+        60% {
+          transform: translate(-49%, -50%);
+        }
+      }
+      .blink {
+        animation: blink-animation 0.8s step-end infinite;
+      }
+      @keyframes blink-animation {
+        50% {
+          opacity: 0;
+        }
+      }
+      .text-jitter {
+        animation: jitter 0.1s infinite;
+      }
+      @keyframes jitter {
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+        25% {
+          transform: translateX(-1px);
+        }
+        50% {
+          transform: translateX(1px);
+        }
+        75% {
+          transform: translateX(-1px);
+        }
+      }
+      @keyframes fadeInReveal {
+        from {
+          opacity: 0;
+          transform: scale(0.8);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      /* --- Media Query for Mobile/Tablets --- */
+      @media (max-width: 768px) {
+        body,
+        html {
+          font-size: 12px; /* Slightly smaller base font for mobile */
+        }
+        #container {
+          padding: 5px; /* Less padding */
+          height: calc(100vh - 10px);
+        }
+        #topBar {
+          padding-bottom: 3px;
+        }
+        #terminal p {
+          font-size: 11px; /* Smaller terminal font */
+          line-height: 1.3; /* Adjust line height */
+        }
+        #fakePopup {
+          padding: 10px;
+          font-size: 13px; /* Adjust popup font */
+        }
+        #fakePopupButton {
+          padding: 8px 15px;
+        }
+
+        #ransomScreen {
+          font-size: 14px; /* Adjust ransom font */
+          padding: 15px 10px;
+        }
+        #ransomScreen h1 {
+          font-size: 1.8em;
+        }
+        #timer {
+          font-size: 2em;
+        }
+        .ransom-details {
+          padding: 10px;
+          font-size: 0.9em;
+        }
+        .encrypted-files {
+          font-size: 0.8em;
+          max-height: 100px;
+        }
+
+        #bsodScreen {
+          font-size: 13px; /* Adjust BSOD font */
+          padding: 10% 5% 5% 5%;
+          line-height: 1.4;
+        }
+        #bsodScreen .sad-face {
+          font-size: 18vw;
+          margin-bottom: 15px;
+        }
+        #bsodScreen .qr-placeholder {
+          width: 60px;
+          height: 60px;
+          margin: 15px 0 10px 0;
+        }
+        .progress-bar {
+          width: 60%;
+          height: 4px;
+        }
+
+        #revealMessage {
+          font-size: 7vw; /* Adjust reveal font */
+        }
+        #revealMessage p:last-child {
+          font-size: 0.4em; /* Keep relative size */
+        }
+      }
+
+      @media (max-width: 480px) {
+        /* Further adjustments for very small screens if needed */
+        body,
+        html {
+          font-size: 11px;
+        }
+        #terminal p {
+          font-size: 10px;
+        }
+        #ransomScreen h1 {
+          font-size: 1.6em;
+        }
+        #timer {
+          font-size: 1.8em;
+        }
+        #bsodScreen .sad-face {
+          font-size: 20vw;
+        }
+        #revealMessage {
+          font-size: 6.5vw;
+        }
+      }
+    </style>
+  </head>
+  <body oncontextmenu="return false;">
+    <div id="container">
+      <!-- Terminal/Main Prank Area -->
+      <div id="prankContent">
+        <div id="topBar">
+          <div>ROOT:/# <span class="blink">_</span></div>
+          <!-- Shorter prompt -->
+          <div class="status-indicators">
+            <span id="webcamIndicator" title="Webcam"></span>
+            <span id="micIndicator" title="Mic"></span>
+            <span id="fakeTime">--:--:--</span>
+          </div>
+        </div>
+        <div id="terminal">
+          <!-- Terminal output appears here -->
+        </div>
+      </div>
+
+      <!-- Fake Security Popup -->
+      <div id="fakePopup">
+        <h3>System Alert</h3>
+        <!-- Simpler title -->
+        <p>Threat Detected: Unknown Malware<br />Status: Spreading</p>
+        <p style="color: red; font-weight: bold">
+          CRITICAL: Cannot isolate threat!
+        </p>
+        <button id="fakePopupButton">Attempt Fix</button>
+      </div>
+
+      <!-- Fake Ransomware Screen -->
+      <div id="ransomScreen">
+        <h1>
+          <span style="animation: jitter 0.2s infinite">☠️ LOCKED ☠️</span>
+        </h1>
+        <!-- Shorter Title -->
+        <div class="ransom-details">
+          <p>
+            Your files are encrypted! Recovery impossible without key. DO NOT
+            REBOOT!
+          </p>
+          <p>Samples:</p>
+          <div class="encrypted-files">
+            <div class="encrypted-file">Photos/img_101.jpg.LCKD</div>
+            <div class="encrypted-file">Documents/report.docx.LCKD</div>
+            <div class="encrypted-file">Downloads/archive.zip.LCKD</div>
+            <div class="encrypted-file">Videos/vacation.mp4.LCKD</div>
+            <div class="encrypted-file">Desktop/notes.txt.LCKD</div>
+          </div>
+          <p>Pay 0.1 XMR within:</p>
+          <div id="timer">00:05:00</div>
+          <!-- Shorter timer for mobile -->
+          <p>Pay Now or lose data forever!</p>
+          <p style="font-size: 10px; margin-top: 10px; color: #aaa">
+            Addr: 4Bcd... (Fake - Do Not Send)
+          </p>
+        </div>
+      </div>
+
+      <!-- Fake BSOD Screen -->
+      <div id="bsodScreen">
+        <p class="sad-face">:(</p>
+        <p>Your device ran into a problem and needs to restart.</p>
+        <p>Collecting error info...</p>
+        <p><span id="bsodProgress">0</span>%</p>
+        <!-- Shorter text -->
+        <div class="progress-bar">
+          <div id="bsodProgressBar" class="progress-bar-fill"></div>
+        </div>
+        <div class="qr-placeholder"></div>
+        <p style="font-size: 12px; margin-top: 10px">
+          More info: system.err/stop
+        </p>
+        <p class="stopcode" style="font-size: 12px">Stop code: SYS_ERR_FATAL</p>
+      </div>
+
+      <!-- Final Reveal Message -->
+      <div id="revealMessage">
+        <p>Ha ha mm oyalage Nirmal</p>
+        <p>(Just a prank! 😉)</p>
+        <!-- Simplified subtext -->
+      </div>
+    </div>
+
+    <!-- Matrix effect canvas -->
+    <canvas id="matrixEffect"></canvas>
+
+    <!-- Audio Elements (Keep existing ones) -->
+    <audio
+      id="typingSound"
+      src="https://cdn.pixabay.com/download/audio/2022/10/24/audio_963fe8a07f.mp3"
+      preload="auto"
+      loop
+    ></audio>
+    <audio
+      id="alertSound"
+      src="https://cdn.pixabay.com/download/audio/2022/11/17/audio_7306449751.mp3"
+      preload="auto"
+    ></audio>
+    <audio
+      id="errorSound"
+      src="https://cdn.pixabay.com/download/audio/2022/03/10/audio_e431e65ea2.mp3"
+      preload="auto"
+    ></audio>
+    <audio
+      id="criticalErrorSound"
+      src="https://cdn.pixabay.com/download/audio/2021/11/12/audio_1087606ae2.mp3"
+      preload="auto"
+    ></audio>
+    <audio
+      id="glitchSound"
+      src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_259991c755.mp3"
+      preload="auto"
+    ></audio>
+    <audio
+      id="heartbeatSound"
+      src="https://cdn.pixabay.com/download/audio/2021/08/04/audio_10b08d805a.mp3"
+      preload="auto"
+      loop
+    ></audio>
+    <audio
+      id="bsodSound"
+      src="https://cdn.pixabay.com/download/audio/2021/09/08/audio_407087cf1a.mp3"
+      preload="auto"
+    ></audio>
+    <audio
+      id="keystrokeSound"
+      src="https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0b2125905.mp3"
+      preload="auto"
+    ></audio>
+    <audio
+      id="revealSound"
+      src="https://cdn.pixabay.com/download/audio/2022/03/10/audio_e431e65ea2.mp3"
+      preload="auto"
+    ></audio>
+
+    <script>
+      // --- Get DOM Elements (Keep as is) ---
+      const container = document.getElementById("container");
+      const bodyEl = document.body;
+      const prankContent = document.getElementById("prankContent");
+      const terminal = document.getElementById("terminal");
+      const webcamIndicator = document.getElementById("webcamIndicator");
+      const micIndicator = document.getElementById("micIndicator");
+      const fakeTimeEl = document.getElementById("fakeTime");
+      const fakePopup = document.getElementById("fakePopup");
+      const fakePopupButton = document.getElementById("fakePopupButton");
+      const ransomScreen = document.getElementById("ransomScreen");
+      const timerEl = document.getElementById("timer");
+      const bsodScreen = document.getElementById("bsodScreen");
+      const bsodProgress = document.getElementById("bsodProgress");
+      const bsodProgressBar = document.getElementById("bsodProgressBar");
+      const matrixCanvas = document.getElementById("matrixEffect");
+      const matrixCtx = matrixCanvas.getContext("2d");
+      const revealMessageDiv = document.getElementById("revealMessage");
+
+      // Audio elements (Keep as is)
+      const sounds = {
+        /* ... same sound elements ... */
+        typing: document.getElementById("typingSound"),
+        alert: document.getElementById("alertSound"),
+        error: document.getElementById("errorSound"),
+        criticalError: document.getElementById("criticalErrorSound"),
+        glitch: document.getElementById("glitchSound"),
+        heartbeat: document.getElementById("heartbeatSound"),
+        bsod: document.getElementById("bsodSound"),
+        keystroke: document.getElementById("keystrokeSound"),
+        reveal: document.getElementById("revealSound"),
+      };
+
+      // Adjust initial sound volumes (Keep as is)
+      Object.values(sounds).forEach((sound) => {
+        if (sound) sound.volume = 0.6;
+      });
+      if (sounds.typing) sounds.typing.volume = 0.3;
+      // ... rest of volume adjustments ...
+      if (sounds.reveal) sounds.reveal.volume = 0.6;
+
+      // --- Matrix Effect Setup (Keep as is, maybe adjust interval/fontSize if perf issues) ---
+      let matrixInterval;
+      const setupMatrixEffect = () => {
+        if (matrixInterval) clearInterval(matrixInterval);
+        matrixCanvas.width = window.innerWidth;
+        matrixCanvas.height = window.innerHeight;
+        const matrixChars = "ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ01"; // Shorter string might help perf slightly
+        const fontSize = window.innerWidth < 768 ? 12 : 16; // Smaller font on mobile
+        const columns = matrixCanvas.width / fontSize;
+        const drops = [];
+        for (let i = 0; i < columns; i++)
+          drops[i] = Math.floor(
+            (Math.random() * matrixCanvas.height) / fontSize
+          );
+
+        function drawMatrix() {
+          matrixCtx.fillStyle = "rgba(0, 0, 0, 0.05)"; // Slightly faster fade
+          matrixCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+          matrixCtx.fillStyle = "var(--matrix-green)";
+          matrixCtx.font = fontSize + "px monospace";
+          for (let i = 0; i < drops.length; i++) {
+            const text = matrixChars.charAt(
+              Math.floor(Math.random() * matrixChars.length)
+            );
+            matrixCtx.fillText(text, i * fontSize, drops[i] * fontSize);
+            if (
+              drops[i] * fontSize > matrixCanvas.height &&
+              Math.random() > 0.975
+            )
+              drops[i] = 0;
+            drops[i]++;
+          }
+        }
+        matrixInterval = setInterval(drawMatrix, 50); // Adjust interval if needed (e.g., 60ms on mobile)
+      };
+
+      // --- Prank Logic Variables (Keep as is) ---
+      let lineIndex = 0;
+      let typingTimeout;
+      let timerInterval;
+      let bsodInterval;
+      let prankStage = 0; // 0: Init, 1: Terminal, 2: Ransom, 3: BSOD, 4: Reveal
+      const fakeFiles = [
+        "/cache/data.db",
+        "DCIM/Camera/IMG_01.jpg",
+        "storage/shared/Downloads/doc.pdf",
+        "Android/data/com.app/files/user.dat",
+      ]; // More mobile-like paths
+      let currentTerminalLineElement = null;
+
+      // --- Generate fake IP addresses (Keep as is) ---
+      function generateFakeIP(type = "external") {
+        /* ... same function ... */
+        if (type === "internal") {
+          return `192.168.${Math.floor(Math.random() * 255)}.${
+            Math.floor(Math.random() * 254) + 1
+          }`;
+        } else {
+          const r = [
+            "104.16.",
+            "45.55.",
+            "172.67.",
+            "23.20.",
+            "216.58.",
+            "8.8.",
+          ][Math.floor(Math.random() * 6)];
+          return `${r}${Math.floor(Math.random() * 255)}.${
+            Math.floor(Math.random() * 254) + 1
+          }`;
+        }
+      }
+
+      // --- Prank Stages Configuration (Keep mostly as is, maybe shorten delays slightly) ---
+      const prankConfig = [
+        {
+          delay: 300,
+          action: "addTerminal",
+          text: "Booting Diag Env v9.5...",
+          class: "term-cmd",
+        },
+        {
+          delay: 500,
+          action: "addTerminal",
+          text: "Scanning Memory...",
+          class: "",
+        },
+        { delay: 400, action: "playSound", sound: "typing", loop: true },
+        {
+          delay: 800,
+          action: "addTerminal",
+          text: "Mem Check [▓▓▓▓▓▓░░░░] 60%",
+          class: "term-progress",
+        },
+        {
+          delay: 700,
+          action: "addTerminal",
+          text: "Mem Check OK.",
+          class: "term-success",
+        },
+        {
+          delay: 600,
+          action: "addTerminal",
+          text: "Checking network...",
+          class: "",
+        },
+        {
+          delay: 500,
+          action: "addTerminal",
+          text: `WARN: Inbound from ${generateFakeIP()}:61111`,
+          class: "term-warn term-ip",
+        },
+        { delay: 600, action: "playSound", sound: "alert" },
+        {
+          delay: 800,
+          action: "addTerminal",
+          text: `Input: 'netstat -tulnp'`,
+          class: "term-input",
+        },
+        {
+          delay: 500,
+          action: "addTerminal",
+          text: `tcp  LISTEN  0  128  *:22  *:*`,
+          class: "",
+        },
+        {
+          delay: 300,
+          action: "addTerminal",
+          text: `tcp  LISTEN  0  5    127.0.0.1:6666 *:*`,
+          class: "term-warn",
+        }, // Suspicious port
+        {
+          delay: 800,
+          action: "addTerminal",
+          text: "CRITICAL: Unknown listener on port 6666!",
+          class: "term-crit",
+          addJitter: true,
+        },
+        { delay: 700, action: "playSound", sound: "criticalError" },
+        {
+          delay: 1000,
+          action: "addTerminal",
+          text: "Attempting kill -9 ...",
+          class: "term-cmd",
+        },
+        {
+          delay: 800,
+          action: "addTerminal",
+          text: "Kill failed. Process hidden.",
+          class: "term-warn",
+        },
+        { delay: 500, action: "removeJitter" },
+        {
+          delay: 800,
+          action: "addTerminal",
+          text: "Scanning FS for IOCs...",
+          class: "",
+        },
+        {
+          delay: 500,
+          action: "addTerminal",
+          text: `   > Found: ${
+            fakeFiles[Math.floor(Math.random() * fakeFiles.length)]
+          }`,
+          class: "term-warn term-filename",
+        },
+        {
+          delay: 400,
+          action: "addTerminal",
+          text: `   > Found: ${
+            fakeFiles[Math.floor(Math.random() * fakeFiles.length)]
+          }`,
+          class: "term-warn term-filename",
+        },
+        {
+          delay: 1000,
+          action: "addTerminal",
+          text: "Escalating privileges (exploit CVE-2023-XXXX)...",
+          class: "term-cmd",
+        },
+        {
+          delay: 900,
+          action: "addTerminal",
+          text: "ROOT ACCESS OBTAINED!",
+          class: "term-success",
+        },
+        { delay: 500, action: "activateWebcam", status: true },
+        { delay: 300, action: "activateMic", status: true },
+        {
+          delay: 200,
+          action: "addTerminal",
+          text: "CRITICAL: HW Streams Captured!",
+          class: "term-crit",
+          addJitter: true,
+        },
+        {
+          delay: 800,
+          action: "addTerminal",
+          text: "Detecting C2 comms...",
+          class: "",
+        },
+        {
+          delay: 500,
+          action: "addTerminal",
+          text: `Data exfil -> ${generateFakeIP()}:443`,
+          class: "term-data term-ip",
+        },
+        {
+          delay: 400,
+          action: "addTerminal",
+          text: `Upload [▓▓░░░░] data.zip 30%`,
+          class: "term-data",
+        },
+        {
+          delay: 600,
+          action: "addTerminal",
+          text: `Upload [▓▓▓▓▓▓] data.zip 100%`,
+          class: "term-data",
+        },
+        {
+          delay: 400,
+          action: "addTerminal",
+          text: "Upload OK.",
+          class: "term-success",
+        },
+        { delay: 1200, action: "showFakePopup" },
+        {
+          delay: 800,
+          action: "addTerminal",
+          text: "!! KERNEL COMPROMISED !!",
+          class: "term-warn",
+        },
+        { delay: 500, action: "removeJitter" },
+        {
+          delay: 400,
+          action: "addTerminal",
+          text: "   > Module: kernel.so",
+          class: "term-warn",
+        },
+        {
+          delay: 800,
+          action: "addTerminal",
+          text: "!! PAYLOAD ACTIVATION !!",
+          class: "term-crit",
+          addJitter: true,
+        },
+        { delay: 500, action: "flashScreen", color: "red" },
+        { delay: 600, action: "startMatrixEffect" },
+        { delay: 500, action: "playSound", sound: "glitch", loop: true },
+        {
+          delay: 300,
+          action: "addTerminal",
+          text: "Injecting Payload...",
+          class: "term-crit",
+        },
+        {
+          delay: 1200,
+          action: "addTerminal",
+          text: "Initiating encryption...",
+          class: "term-crit",
+        },
+        { delay: 2000, action: "triggerRansom" }, // Shorter delay before ransom maybe?
+      ];
+
+      // --- Utility Functions (Keep mostly as is) ---
+      function playSound(soundName, loop = false) {
+        /* ... */ try {
+          const s = sounds[soundName];
+          if (s) {
+            s.loop = loop;
+            s.currentTime = 0;
+            s.play().catch((e) => console.warn(`Audio ${soundName}:`, e));
+          }
+        } catch (e) {
+          console.error("Sound err:", e);
+        }
+      }
+      function stopSound(soundName) {
+        /* ... */ try {
+          const s = sounds[soundName];
+          if (s) {
+            s.pause();
+            s.currentTime = 0;
+          }
+        } catch (e) {
+          console.error("Stop err:", e);
+        }
+      }
+      function stopAllSounds() {
+        Object.keys(sounds).forEach(stopSound);
+      }
+      function updateClock() {
+        /* ... */ const t = new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        if (fakeTimeEl) fakeTimeEl.textContent = t;
+      }
+      function addTerminalLine(text, className = "", addJitter = false) {
+        /* ... */ if (!terminal) return;
+        while (terminal.childElementCount > 100)
+          terminal.removeChild(terminal.firstChild);
+        const p = document.createElement("p");
+        p.textContent = text;
+        if (className) p.className = className;
+        if (addJitter) {
+          p.classList.add("text-jitter");
+          currentTerminalLineElement = p;
+        }
+        terminal.appendChild(p);
+        terminal.scrollTop = terminal.scrollHeight;
+        if (sounds.keystroke && Math.random() < 0.5) {
+          sounds.keystroke.currentTime = 0;
+          sounds.keystroke.play().catch((e) => {});
+        }
+      }
+      function removeJitter() {
+        /* ... */ if (currentTerminalLineElement) {
+          currentTerminalLineElement.classList.remove("text-jitter");
+          currentTerminalLineElement = null;
+        }
+      }
+      function activateWebcam(status) {
+        /* ... */ if (webcamIndicator)
+          webcamIndicator.classList.toggle("active", status);
+      }
+      function activateMic(status) {
+        /* ... */ if (micIndicator)
+          micIndicator.classList.toggle("active", status);
+      }
+      function showFakePopup() {
+        /* ... */ if (fakePopup) {
+          fakePopup.style.display = "block";
+          playSound("error");
+        }
+      }
+      function handleFakePopupClick() {
+        /* ... */ playSound("criticalError");
+        addTerminalLine("!! FAILED - Rootkit Blocked !!", "term-crit", true);
+        addTerminalLine("!! Payload Accelerated !!", "term-crit");
+        flashScreen("red");
+        hideFakePopup();
+      }
+      function hideFakePopup() {
+        /* ... */ if (fakePopup) fakePopup.style.display = "none";
+      }
+      function flashScreen(color) {
+        /* ... */ if (color === "red") {
+          bodyEl.classList.add("screen-flash-red");
+          playSound("glitch");
+          setTimeout(() => bodyEl.classList.remove("screen-flash-red"), 150);
+        }
+      }
+      function startMatrixEffect() {
+        /* ... */ matrixCanvas.style.display = "block";
+        setupMatrixEffect();
+      }
+      function stopMatrixEffect() {
+        /* ... */ if (matrixInterval) clearInterval(matrixInterval);
+        matrixCanvas.style.display = "none";
+      }
+
+      // --- Prank Stage Trigger Functions (Update Ransom Timer) ---
+      function triggerRansom() {
+        /* ... */ prankStage = 2;
+        removeJitter();
+        stopSound("typing");
+        stopSound("glitch");
+        stopMatrixEffect();
+        hideFakePopup();
+        if (prankContent) prankContent.style.display = "none";
+        if (ransomScreen) ransomScreen.style.display = "flex";
+        playSound("heartbeat", true);
+        startTimer(1 * 15); /* 5 minute timer */
+      }
+      function startTimer(durationInSeconds) {
+        /* ... (Keep timer logic, adjust cues if needed) ... */ let t =
+          durationInSeconds;
+        if (timerInterval) clearInterval(timerInterval);
+        const u = () => {
+          if (t < 0) return;
+          const m = Math.floor(t / 60),
+            s = t % 60;
+          timerEl.textContent = `${String(m).padStart(2, "0")}:${String(
+            s
+          ).padStart(2, "0")}`;
+          if (t <= 30 && t > 10) {
+            timerEl.style.color = "var(--hacker-yellow)";
+            timerEl.style.animation = "pulse-text 1s infinite";
+          } else if (t <= 10) {
+            timerEl.style.color = "var(--hacker-red)";
+            timerEl.style.animation = "pulse-text .5s infinite";
+            if (t > 0) playSound("alert");
+            flashScreen("red");
+          } else {
+            timerEl.style.color = "var(--hacker-yellow)";
+            timerEl.style.animation = "none";
+          }
+        };
+        u();
+        timerInterval = setInterval(() => {
+          t--;
+          u();
+          if (t < 0) {
+            clearInterval(timerInterval);
+            timerEl.textContent = "00:00";
+            playSound("criticalError");
+            triggerBSOD();
+          }
+        }, 1000);
+      }
+      function triggerBSOD() {
+        /* ... */ prankStage = 3;
+        stopAllSounds();
+        stopMatrixEffect();
+        if (ransomScreen) ransomScreen.style.display = "none";
+        if (fakePopup) fakePopup.style.display = "none";
+        if (prankContent) prankContent.style.display = "none";
+        if (bsodScreen) bsodScreen.style.display = "flex";
+        playSound("bsod");
+        startBsodProgress(10000); /* 10 second BSOD */
+      }
+      function startBsodProgress(durationMs) {
+        /* ... */ let p = 0;
+        const i = 1,
+          t = durationMs / (100 / i);
+        if (bsodInterval) clearInterval(bsodInterval);
+        bsodInterval = setInterval(() => {
+          p += i;
+          if (p >= 100) {
+            p = 100;
+            clearInterval(bsodInterval);
+            showFinalReveal();
+          }
+          if (bsodProgress) bsodProgress.textContent = p;
+          if (bsodProgressBar) bsodProgressBar.style.width = `${p}%`;
+        }, t);
+      }
+
+      // --- Final Reveal Function (Keep as is) ---
+      function showFinalReveal() {
+        /* ... */ prankStage = 4;
+        stopAllSounds();
+        if (bsodScreen) bsodScreen.style.display = "none";
+        /*...*/ if (revealMessageDiv) {
+          revealMessageDiv.style.display = "flex";
+          playSound("reveal");
+        }
+        bodyEl.classList.remove("hide-cursor");
+        if (document.fullscreenElement)
+          document
+            .exitFullscreen()
+            .catch((e) => console.warn("Exit fullscreen:", e));
+      }
+
+      // --- Main Prank Sequence Execution (Keep as is) ---
+      function runPrankSequence() {
+        /* ... (Keep sequence logic) ... */ if (
+          lineIndex >= prankConfig.length ||
+          prankStage >= 2
+        ) {
+          stopSound("typing");
+          removeJitter();
+          return;
+        }
+        const s = prankConfig[lineIndex++];
+        setTimeout(() => {
+          if (prankStage >= 2) return;
+          switch (s.action) {
+            case "addTerminal":
+              addTerminalLine(s.text, s.class, s.addJitter);
+              break;
+            case "removeJitter":
+              removeJitter();
+              break;
+            /*...*/ case "triggerRansom":
+              triggerRansom();
+              break;
+            case "triggerBSOD":
+              triggerBSOD();
+              break;
+            default:
+              console.warn("Action:", s.action);
+          }
+          if (prankStage < 2) {
+            runPrankSequence();
+          }
+        }, s.delay);
+      }
+
+      // --- Event Listeners and Initialization (Update Interaction Prompt and Listener) ---
+      document.addEventListener("DOMContentLoaded", () => {
+        updateClock();
+        setInterval(updateClock, 1000);
+        if (fakePopupButton) {
+          fakePopupButton.addEventListener("click", handleFakePopupClick);
+        }
+
+        const startInteraction = (event) => {
+          event.preventDefault(); // Prevent potential double-triggering issues
+
+          // Request fullscreen and hide cursor (best effort)
+          bodyEl.requestFullscreen().catch((err) => {
+            // Silently ignore errors, common on mobile or if denied
+          });
+          bodyEl.classList.add("hide-cursor"); // Desktop will hide, mobile ignores
+
+          // Prime sounds
+          Object.values(sounds).forEach((sound) => {
+            if (sound && sound.readyState >= 3) {
+              sound
+                .play()
+                .then(() => sound.pause())
+                .catch((e) => {});
+            }
+          });
+
+          addTerminalLine("System Initializing...", "");
+          prankStage = 1;
+          runPrankSequence();
+
+          // Listeners are removed automatically by {once: true}
+        };
+
+        // Add message asking for interaction
+        addTerminalLine(
+          ">>> Tap or Click anywhere to start diagnostics <<<",
+          "term-warn blink"
+        ); // Updated text
+
+        // Add listeners for both touch and click, ensuring they only fire once
+        bodyEl.addEventListener("touchstart", startInteraction, {
+          once: true,
+          passive: false,
+        }); // Use passive:false if preventDefault is needed
+        bodyEl.addEventListener("click", startInteraction, { once: true });
+      });
+
+      // --- Window Resize Handling (Keep as is) ---
+      let resizeTimeout;
+      window.addEventListener("resize", () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+          if (matrixCanvas.style.display === "block") {
+            setupMatrixEffect();
+          }
+        }, 250);
+      });
+    </script>
+  </body>
+</html>
